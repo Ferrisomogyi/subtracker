@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SubTracker — Abonnementenbeheer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface-2: #1a1a26;
+  --border: #2a2a3a;
+  --text: #e8e8f0;
+  --text-muted: #8888a0;
+  --accent: #00d4aa;
+  --accent-dim: rgba(0,212,170,0.12);
+  --warning: #ffb347;
+  --warning-dim: rgba(255,179,71,0.12);
+  --danger: #ff5757;
+  --danger-dim: rgba(255,87,87,0.12);
+  --safe: #4ecdc4;
+  --safe-dim: rgba(78,205,196,0.12);
+  --ferri: #00d4aa;
+  --shoutout: #a78bfa;
+  --dta: #f59e0b;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+.app { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+.logo { font-family: 'Space Mono', monospace; font-size: 1.6rem; font-weight: 700; color: var(--accent); letter-spacing: -1px; }
+.logo span { color: var(--text-muted); font-weight: 400; font-size: 0.85rem; margin-left: 8px; letter-spacing: 0; }
+
+.workspace-tabs { display: flex; gap: 4px; margin-bottom: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px; flex-wrap: wrap; }
+.ws-tab { font-family: 'DM Sans', sans-serif; font-size: 0.84rem; font-weight: 600; padding: 9px 18px; border: none; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.ws-tab:hover { color: var(--text); background: var(--surface-2); }
+.ws-tab.active { color: #fff; }
+.ws-tab.active[data-ws="all"] { background: var(--accent); color: var(--bg); }
+.ws-tab.active[data-ws="ferri"] { background: var(--ferri); color: var(--bg); }
+.ws-tab.active[data-ws="shoutout"] { background: var(--shoutout); color: #fff; }
+.ws-tab.active[data-ws="dta"] { background: var(--dta); color: var(--bg); }
+.ws-tab .ws-count { font-family: 'Space Mono', monospace; font-size: 0.68rem; background: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 4px; }
+.ws-tab.active .ws-count { background: rgba(0,0,0,0.2); }
+.ws-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 22px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 15px 16px; position: relative; overflow: hidden; }
+.stat-card::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; }
+.stat-card.total::after { background: var(--accent); }
+.stat-card.monthly::after { background: var(--warning); }
+.stat-card.yearly::after { background: var(--safe); }
+.stat-card.alerts::after { background: var(--danger); }
+.stat-card.daily::after { background: var(--shoutout); }
+.stat-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.stat-value { font-family: 'Space Mono', monospace; font-size: 1.35rem; font-weight: 700; }
+.stat-value.money::before { content: '€'; font-size: 0.9rem; margin-right: 2px; opacity: 0.6; }
+
+.warning-panel { background: var(--danger-dim); border: 1px solid rgba(255,87,87,0.3); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; display: none; }
+.warning-panel.active { display: block; }
+.warning-panel h3 { color: var(--danger); font-size: 0.82rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.warning-item { font-size: 0.8rem; padding: 5px 0; border-bottom: 1px solid rgba(255,87,87,0.1); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.warning-item:last-child { border-bottom: none; }
+
+.controls { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+.btn { font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 600; padding: 9px 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; transition: all 0.2s; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.btn.primary:hover { background: #00e6b8; }
+.search-box { flex: 1; min-width: 180px; padding: 9px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.82rem; outline: none; }
+.search-box:focus { border-color: var(--accent); }
+.search-box::placeholder { color: var(--text-muted); }
+
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 11px 13px; font-size: 0.67rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 11px 13px; font-size: 0.83rem; border-bottom: 1px solid rgba(42,42,58,0.5); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(0,212,170,0.03); }
+.sub-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.sub-name .ws-badge { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sub-category { display: inline-block; font-size: 0.67rem; padding: 2px 7px; border-radius: 4px; background: var(--surface-2); color: var(--text-muted); }
+.sub-price { font-family: 'Space Mono', monospace; font-weight: 700; white-space: nowrap; }
+.sub-cycle { font-size: 0.72rem; color: var(--text-muted); }
+.status-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 0.71rem; font-weight: 600; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.status-badge.danger { background: var(--danger-dim); color: var(--danger); }
+.status-badge.warning { background: var(--warning-dim); color: var(--warning); }
+.status-badge.safe { background: var(--safe-dim); color: var(--safe); }
+.status-badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.status-badge.danger .dot { animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.days-left { font-family: 'Space Mono', monospace; font-size: 0.77rem; }
+.actions { display: flex; gap: 5px; }
+.icon-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.78rem; transition: all 0.2s; }
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.icon-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+
+.section-header td { background: var(--surface-2) !important; font-weight: 700; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 1.5px; padding: 9px 13px; border-bottom: 1px solid var(--border); }
+.section-header td .section-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+.section-header td .section-total { float: right; font-family: 'Space Mono', monospace; font-size: 0.73rem; color: var(--text-muted); }
+
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 100; justify-content: center; align-items: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+.modal h2 { font-size: 1.05rem; margin-bottom: 18px; color: var(--accent); }
+.form-group { margin-bottom: 13px; }
+.form-group label { display: block; font-size: 0.71rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 5px; }
+.form-group input, .form-group select { width: 100%; padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; outline: none; }
+.form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end; }
+
+.toolbar { display: flex; gap: 8px; margin-left: auto; }
+.empty-state { text-align: center; padding: 50px 20px; color: var(--text-muted); }
+.empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.4; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--accent); }
+th .sort-arrow { margin-left: 4px; font-size: 0.55rem; }
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface-2); border: 1px solid var(--accent); color: var(--text); padding: 11px 18px; border-radius: 10px; font-size: 0.82rem; z-index: 200; transform: translateY(100px); opacity: 0; transition: all 0.3s ease; }
+.toast.show { transform: translateY(0); opacity: 1; }
+
+@media (max-width: 768px) {
+  .stats-bar { grid-template-columns: 1fr 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .table-wrap { overflow-x: auto; }
+  table { min-width: 800px; }
+  .header { flex-direction: column; align-items: flex-start; }
+  .ws-tab { padding: 7px 12px; font-size: 0.76rem; }
+}
+/* Scan modal */
+.scan-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.scan-item { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; transition: border-color 0.2s; cursor: pointer; }
+.scan-item:hover { border-color: var(--accent); }
+.scan-item.selected { border-color: var(--accent); background: var(--accent-dim); }
+.scan-check { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 5px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.7rem; }
+.scan-item.selected .scan-check { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.scan-info { flex: 1; min-width: 0; }
+.scan-info .si-name { font-weight: 600; font-size: 0.85rem; }
+.scan-info .si-detail { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+.scan-price { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 0.88rem; white-space: nowrap; }
+.scan-results-scroll { max-height: 350px; overflow-y: auto; padding-right: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">SubTracker <span>abonnementenbeheer</span></div>
+    <div class="toolbar">
+      <label class="btn primary" style="cursor:pointer">📷 Scan screenshot<input type="file" accept="image/*" onchange="scanScreenshot(event)" style="display:none"></label>
+      <button class="btn" onclick="exportData()">📤 Export</button>
+      <label class="btn">📥 Import<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+    </div>
+  </div>
+
+  <div class="workspace-tabs">
+    <button class="ws-tab active" data-ws="all" onclick="switchWs('all')">Alles <span class="ws-count" id="countAll">0</span></button>
+    <button class="ws-tab" data-ws="ferri" onclick="switchWs('ferri')"><span class="ws-dot" style="background:var(--ferri)"></span>Ferri <span class="ws-count" id="countFerri">0</span></button>
+    <button class="ws-tab" data-ws="shoutout" onclick="switchWs('shoutout')"><span class="ws-dot" style="background:var(--shoutout)"></span>ShoutOut.vip <span class="ws-count" id="countShoutout">0</span></button>
+    <button class="ws-tab" data-ws="dta" onclick="switchWs('dta')"><span class="ws-dot" style="background:var(--dta)"></span>DTA <span class="ws-count" id="countDta">0</span></button>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-card total"><div class="stat-label">Abonnementen</div><div class="stat-value" id="statTotal">0</div></div>
+    <div class="stat-card monthly"><div class="stat-label">Per maand</div><div class="stat-value money" id="statMonthly">0</div></div>
+    <div class="stat-card yearly"><div class="stat-label">Per jaar</div><div class="stat-value money" id="statYearly">0</div></div>
+    <div class="stat-card daily"><div class="stat-label">Per dag</div><div class="stat-value money" id="statDaily">0</div></div>
+    <div class="stat-card alerts"><div class="stat-label">Waarschuwingen</div><div class="stat-value" id="statAlerts">0</div></div>
+  </div>
+
+  <div class="warning-panel" id="warningPanel">
+    <h3>⚠️ Komende verlengingen</h3>
+    <div id="warningList"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" onclick="openModal()">+ Nieuw abonnement</button>
+    <input type="text" class="search-box" placeholder="Zoeken..." oninput="renderTable()" id="searchInput">
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th class="sortable" onclick="sortBy('name')">Naam <span class="sort-arrow" id="sort-name"></span></th>
+        <th class="sortable" onclick="sortBy('price')">Prijs <span class="sort-arrow" id="sort-price"></span></th>
+        <th>Cyclus</th>
+        <th class="sortable" onclick="sortBy('renewal')">Verlenging <span class="sort-arrow" id="sort-renewal"></span></th>
+        <th>Status</th>
+        <th>Dagen</th>
+        <th>Categorie</th>
+        <th>Sectie</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none;"><div class="icon">📋</div><p>Geen abonnementen gevonden.</p></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <h2 id="modalTitle">Nieuw abonnement</h2>
+    <input type="hidden" id="editId">
+    <div class="form-group"><label>Naam</label><input type="text" id="fName" placeholder="bijv. Netflix, Spotify..."></div>
+    <div class="form-row">
+      <div class="form-group"><label>Prijs (€)</label><input type="number" id="fPrice" step="0.01" min="0" placeholder="12.99"></div>
+      <div class="form-group"><label>Cyclus</label><select id="fCycle"><option value="maandelijks">Maandelijks</option><option value="jaarlijks">Jaarlijks</option><option value="kwartaal">Per kwartaal</option><option value="halfjaarlijks">Halfjaarlijks</option><option value="wekelijks">Wekelijks</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Verlengingsdatum</label><input type="date" id="fRenewal"></div>
+      <div class="form-group"><label>Waarschuw (dagen voor)</label><input type="number" id="fWarnDays" min="1" max="90" value="7"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Categorie</label><select id="fCategory"><option value="Streaming">Streaming</option><option value="Software">Software</option><option value="Cloud">Cloud / Opslag</option><option value="AI">AI Tools</option><option value="Muziek">Muziek</option><option value="Telecom">Telecom</option><option value="Verzekering">Verzekering</option><option value="Sport">Sport / Fitness</option><option value="Nieuws">Nieuws / Media</option><option value="Gaming">Gaming</option><option value="Auto">Auto / Mobiliteit</option><option value="Beveiliging">Beveiliging</option><option value="Productiviteit">Productiviteit</option><option value="Social Media">Social Media</option><option value="Zakelijk">Zakelijk</option><option value="Anders">Anders</option></select></div>
+      <div class="form-group"><label>Sectie</label><select id="fWorkspace"><option value="ferri">🟢 Ferri</option><option value="shoutout">🟣 ShoutOut.vip</option><option value="dta">🟡 DTA</option></select></div>
+    </div>
+    <div class="form-group"><label>Notitie (optioneel)</label><input type="text" id="fNote" placeholder="bijv. opzeglink, details..."></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Annuleren</button><button class="btn primary" onclick="saveSub()">Opslaan</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="scanOverlay" onclick="if(event.target===this)closeScan()">
+  <div class="modal" style="max-width:600px">
+    <h2 id="scanTitle">📷 Screenshot scannen</h2>
+    <div id="scanStage1">
+      <div id="scanPreview" style="margin-bottom:16px;border-radius:8px;overflow:hidden;max-height:300px;display:none"><img id="scanImg" style="width:100%;display:block"></div>
+      <div id="scanLoading" style="display:none;text-align:center;padding:40px 0">
+        <div class="scan-spinner"></div>
+        <p style="margin-top:14px;color:var(--text-muted);font-size:0.85rem" id="scanStatus">Screenshot wordt geanalyseerd door AI...</p>
+      </div>
+    </div>
+    <div id="scanStage2" style="display:none">
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px" id="scanFoundMsg"></p>
+      <div id="scanResults"></div>
+      <div class="form-group" style="margin-top:14px">
+        <label>Toevoegen aan sectie</label>
+        <select id="scanWorkspace"><option value="ferri">🟢 Ferri</option><option value="shoutout">🟣 ShoutOut.vip</option><option value="dta">🟡 DTA</option></select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeScan()">Annuleren</button>
+        <button class="btn primary" onclick="addScanned()">Geselecteerde toevoegen</button>
+      </div>
+    </div>
+    <div id="scanError" style="display:none;text-align:center;padding:20px 0">
+      <p style="color:var(--danger);font-size:0.88rem" id="scanErrorMsg"></p>
+      <button class="btn" style="margin-top:12px" onclick="closeScan()">Sluiten</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SK='subtracker_v3b';
+let subs=[],sortField='renewal',sortAsc=true,activeWs='all';
+const WC={ferri:'#00d4aa',shoutout:'#a78bfa',dta:'#f59e0b'};
+const WL={ferri:'Ferri',shoutout:'ShoutOut.vip',dta:'DTA'};
+
+const DEF=[
+  // === PLAY STORE (bestaand) ===
+  {id:'d01',name:'Hula - AI Video Generator',price:29.99,cycle:'jaarlijks',renewal:'2026-05-11',warnDays:14,category:'AI',workspace:'ferri',note:'Opgezegd'},
+  {id:'d02',name:'AI Studio - Video & Image AI',price:0,cycle:'maandelijks',renewal:'2026-06-20',warnDays:7,category:'AI',workspace:'ferri',note:'Opgezegd, gratis'},
+  {id:'d03',name:'Radarbot Speed Camera Detector',price:0,cycle:'jaarlijks',renewal:'2026-12-28',warnDays:14,category:'Auto',workspace:'ferri',note:'Opgezegd, GOLD'},
+  {id:'d04',name:'Adobe Scan: PDF & OCR',price:76.99,cycle:'jaarlijks',renewal:'2027-02-15',warnDays:14,category:'Productiviteit',workspace:'ferri',note:'Scan Premium Jaarlijks'},
+  {id:'d05',name:'Birdbuddy: herken & verzamel',price:29.99,cycle:'jaarlijks',renewal:'2026-12-09',warnDays:14,category:'Anders',workspace:'ferri',note:''},
+  {id:'d06',name:'Dropbox Plus',price:11.99,cycle:'maandelijks',renewal:'2026-04-19',warnDays:7,category:'Cloud',workspace:'ferri',note:'2TB opslag, 30d recover'},
+  {id:'d07',name:'Find My: Phone, Watch, Earbuds',price:10.99,cycle:'jaarlijks',renewal:'2026-08-26',warnDays:14,category:'Beveiliging',workspace:'ferri',note:'Real-Time Tracker, Bluetooth'},
+  {id:'d08',name:'Filsmeister PRO',price:6.49,cycle:'maandelijks',renewal:'2026-03-27',warnDays:5,category:'Auto',workspace:'ferri',note:'Geen ads, Apple CarPlay/Android Auto'},
+  {id:'d09',name:'Google Home Premium',price:0,cycle:'maandelijks',renewal:'2026-08-11',warnDays:7,category:'Software',workspace:'ferri',note:'Prijswijziging verwacht'},
+  {id:'d10',name:'Google One AI Pro (2TB)',price:21.99,cycle:'maandelijks',renewal:'2026-04-01',warnDays:7,category:'Cloud',workspace:'ferri',note:'Gemini 1.5 in o.a. Gmail, Drive, Foto\'s'},
+  {id:'d11',name:'Grok - SuperGrok',price:34.99,cycle:'maandelijks',renewal:'2026-04-02',warnDays:7,category:'AI',workspace:'ferri',note:'Longer chats, priority access'},
+  {id:'d12',name:'Lightroom Photo & Video',price:5.49,cycle:'maandelijks',renewal:'2026-04-28',warnDays:7,category:'Software',workspace:'ferri',note:'Premium'},
+  {id:'d13',name:'LinkedIn Premium Business',price:52.01,cycle:'maandelijks',renewal:'2026-04-19',warnDays:7,category:'Zakelijk',workspace:'ferri',note:'InMail, Company Insights, Learning'},
+  {id:'d14',name:'Lumenate Plus',price:83.99,cycle:'jaarlijks',renewal:'2026-12-31',warnDays:14,category:'Anders',workspace:'ferri',note:'900+ min sessions, offline'},
+  {id:'d15',name:'Norton 360 Mobile Security',price:44.99,cycle:'jaarlijks',renewal:'2026-05-09',warnDays:14,category:'Beveiliging',workspace:'ferri',note:'VPN, Ad Trackers, Dark Web Monitoring'},
+  {id:'d16',name:'Plaud AI Note Taker Pro',price:64.99,cycle:'jaarlijks',renewal:'2026-12-22',warnDays:14,category:'AI',workspace:'ferri',note:'Transcription & Summarization'},
+  {id:'d17',name:'X (Twitter) Premium',price:0,cycle:'jaarlijks',renewal:'2026-05-31',warnDays:14,category:'Social Media',workspace:'ferri',note:'Prijswijziging verwacht'},
+  {id:'d18',name:'YouTube Premium',price:13.99,cycle:'maandelijks',renewal:'2026-04-02',warnDays:7,category:'Streaming',workspace:'ferri',note:'Geen ads, downloads, originele series'},
+  // === GMAIL VONDSTEN ===
+  {id:'g01',name:'Claude Max (20x)',price:217.80,cycle:'maandelijks',renewal:'2026-04-08',warnDays:7,category:'AI',workspace:'ferri',note:'Anthropic, incl. 21% BTW. Via Link betaald'},
+  {id:'g02',name:'Odido Mobiel',price:86.99,cycle:'maandelijks',renewal:'2026-04-20',warnDays:7,category:'Telecom',workspace:'ferri',note:'Nr: 0634265469, incl. MB-aanvullers'},
+  {id:'g03',name:'DELTA Internet & TV',price:89.45,cycle:'maandelijks',renewal:'2026-04-19',warnDays:7,category:'Telecom',workspace:'ferri',note:'Klantnr: 50369357, automatische incasso'},
+  {id:'g04',name:'Netflix',price:20.99,cycle:'maandelijks',renewal:'2026-03-28',warnDays:5,category:'Streaming',workspace:'ferri',note:'Via PayPal'},
+  {id:'g05',name:'Disney+',price:15.99,cycle:'maandelijks',renewal:'2026-04-22',warnDays:7,category:'Streaming',workspace:'ferri',note:'Via Apple, Visa 2171'},
+  {id:'g06',name:'Apple TV+',price:9.99,cycle:'maandelijks',renewal:'2026-04-19',warnDays:7,category:'Streaming',workspace:'ferri',note:'Via Apple'},
+  {id:'g07',name:'Apple Music',price:10.99,cycle:'maandelijks',renewal:'2026-04-03',warnDays:7,category:'Muziek',workspace:'ferri',note:'Individueel, via Apple'},
+  {id:'g08',name:'HBO Max Standard',price:11.99,cycle:'maandelijks',renewal:'2026-03-29',warnDays:5,category:'Streaming',workspace:'ferri',note:'Via Samsung TV Checkout'},
+  {id:'g09',name:'Prime Video (advertentievrij)',price:3.99,cycle:'maandelijks',renewal:'2026-04-16',warnDays:7,category:'Streaming',workspace:'ferri',note:'Betalingsprobleem! Betaalmethode updaten'},
+  {id:'g10',name:'Surfshark VPN',price:99.63,cycle:'jaarlijks',renewal:'2026-04-01',warnDays:14,category:'Beveiliging',workspace:'ferri',note:'12-maanden plan, betaalgegevens updaten'},
+  {id:'g11',name:'ElevenLabs Creator',price:22.00,cycle:'maandelijks',renewal:'2026-04-11',warnDays:7,category:'AI',workspace:'ferri',note:'50% korting 1e maand, Visa 2171. Prijs in USD'},
+  {id:'g12',name:'Wispr Flow Pro',price:144.00,cycle:'jaarlijks',renewal:'2027-03-11',warnDays:14,category:'AI',workspace:'ferri',note:'Spraak-naar-tekst, via Link'},
+  {id:'g13',name:'Apify',price:35.09,cycle:'maandelijks',renewal:'2026-04-20',warnDays:7,category:'Software',workspace:'ferri',note:'Scraping platform, prijs in USD'},
+  {id:'g14',name:'Microsoft 365',price:22.00,cycle:'maandelijks',renewal:'2026-03-28',warnDays:5,category:'Software',workspace:'ferri',note:'Via PayPal'},
+  {id:'g15',name:'Total Drive',price:14.99,cycle:'maandelijks',renewal:'2026-04-15',warnDays:7,category:'Cloud',workspace:'ferri',note:'Backup, via PayPal'},
+  {id:'g16',name:'Kien Lease (FS Productions)',price:0,cycle:'maandelijks',renewal:'2026-04-24',warnDays:7,category:'Zakelijk',workspace:'ferri',note:'Lease factuur FS Productions - bedrag variabel'},
+  {id:'g17',name:'Kien Lease (Privé)',price:0,cycle:'maandelijks',renewal:'2026-04-24',warnDays:7,category:'Zakelijk',workspace:'ferri',note:'Lease factuur privé - bedrag variabel'},
+  {id:'g18',name:'ANWB Laadpas',price:0,cycle:'maandelijks',renewal:'2026-04-02',warnDays:7,category:'Auto',workspace:'ferri',note:'Zeekr laden, variabel bedrag'},
+  {id:'g19',name:'xAI API',price:25.00,cycle:'maandelijks',renewal:'2026-04-01',warnDays:7,category:'AI',workspace:'ferri',note:'Grok API credits, prijs in USD'},
+  {id:'g20',name:'EasyPark',price:0,cycle:'maandelijks',renewal:'2026-04-01',warnDays:7,category:'Auto',workspace:'ferri',note:'Parkeerkosten variabel, via Riverty'},
+  {id:'g21',name:'exe.dev (Exemplaar)',price:20.00,cycle:'maandelijks',renewal:'2026-03-30',warnDays:5,category:'Software',workspace:'ferri',note:'Individual plan, $20/mnd, Visa 2171. Prijs in USD'},
+];
+
+function load(){try{const s=localStorage.getItem(SK);subs=s?JSON.parse(s):[...DEF];if(!s)save();}catch{subs=[...DEF];save();}}
+function save(){localStorage.setItem(SK,JSON.stringify(subs));}
+function gid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function du(d){const t=new Date();t.setHours(0,0,0,0);const r=new Date(d);r.setHours(0,0,0,0);return Math.ceil((r-t)/864e5);}
+function tm(p,c){switch(c){case'wekelijks':return p*4.33;case'maandelijks':return p;case'kwartaal':return p/3;case'halfjaarlijks':return p/6;case'jaarlijks':return p/12;default:return p;}}
+function fmt(n){return n.toFixed(2).replace('.',',');}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+function getF(){const q=document.getElementById('searchInput').value.toLowerCase();return subs.filter(s=>{const w=activeWs==='all'||s.workspace===activeWs;const m=!q||s.name.toLowerCase().includes(q)||s.category.toLowerCase().includes(q)||(s.note&&s.note.toLowerCase().includes(q))||WL[s.workspace].toLowerCase().includes(q);return w&&m;});}
+
+function updateStats(){
+  const f=getF();const mo=f.reduce((s,x)=>s+tm(x.price,x.cycle),0);
+  document.getElementById('statTotal').textContent=f.length;
+  document.getElementById('statMonthly').textContent=fmt(mo);
+  document.getElementById('statYearly').textContent=fmt(mo*12);
+  document.getElementById('statDaily').textContent=fmt(mo/30.44);
+  const al=f.filter(s=>du(s.renewal)<=s.warnDays);
+  document.getElementById('statAlerts').textContent=al.length;
+  document.getElementById('countAll').textContent=subs.length;
+  document.getElementById('countFerri').textContent=subs.filter(s=>s.workspace==='ferri').length;
+  document.getElementById('countShoutout').textContent=subs.filter(s=>s.workspace==='shoutout').length;
+  document.getElementById('countDta').textContent=subs.filter(s=>s.workspace==='dta').length;
+  const panel=document.getElementById('warningPanel'),list=document.getElementById('warningList');
+  const aa=subs.filter(s=>du(s.renewal)<=s.warnDays);
+  if(aa.length>0){panel.classList.add('active');list.innerHTML=aa.sort((a,b)=>du(a.renewal)-du(b.renewal)).map(s=>{const d=du(s.renewal);const l=d<0?Math.abs(d)+'d verlopen':d===0?'Vandaag!':'nog '+d+'d';return`<div class="warning-item"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${WC[s.workspace]};margin-right:6px;vertical-align:middle"></span><strong>${esc(s.name)}</strong> — €${fmt(s.price)}</span><span class="status-badge ${d<=0?'danger':'warning'}"><span class="dot"></span>${l}</span></div>`;}).join('');}else{panel.classList.remove('active');}
+}
+
+function renderTable(){
+  let f=getF();
+  f.sort((a,b)=>{let va,vb;if(sortField==='name'){va=a.name.toLowerCase();vb=b.name.toLowerCase();}else if(sortField==='price'){va=a.price;vb=b.price;}else{va=new Date(a.renewal);vb=new Date(b.renewal);}if(va<vb)return sortAsc?-1:1;if(va>vb)return sortAsc?1:-1;return 0;});
+  ['name','price','renewal'].forEach(x=>{document.getElementById('sort-'+x).textContent=sortField===x?(sortAsc?'▲':'▼'):'';});
+  const tb=document.getElementById('tableBody'),em=document.getElementById('emptyState');
+  if(!f.length){tb.innerHTML='';em.style.display='block';updateStats();return;}
+  em.style.display='none';
+  let h='';
+  if(activeWs==='all'){
+    const g={ferri:[],shoutout:[],dta:[]};f.forEach(s=>{if(g[s.workspace])g[s.workspace].push(s);});
+    for(const w of['ferri','shoutout','dta']){if(!g[w].length)continue;const m=g[w].reduce((s,x)=>s+tm(x.price,x.cycle),0);h+=`<tr class="section-header"><td colspan="9"><span class="section-dot" style="background:${WC[w]}"></span>${WL[w]}<span class="section-total">€${fmt(m)}/mnd · €${fmt(m*12)}/jr</span></td></tr>`;h+=g[w].map(rr).join('');}
+  }else{h=f.map(rr).join('');}
+  tb.innerHTML=h;updateStats();
+}
+
+function rr(s){
+  const d=du(s.renewal);let sc,st;
+  if(d<0){sc='danger';st='Verlopen';}else if(d<=s.warnDays){sc=d<=3?'danger':'warning';st=d<=3?'Bijna!':'Let op';}else{sc='safe';st='OK';}
+  const rd=new Date(s.renewal).toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'});
+  const dt=d<0?Math.abs(d)+'d geleden':d===0?'Vandaag':d+'d';
+  return`<tr><td><div class="sub-name"><span class="ws-badge" style="background:${WC[s.workspace]}"></span>${esc(s.name)}</div>${s.note?`<div style="font-size:0.69rem;color:var(--text-muted);margin-top:2px;margin-left:16px">${esc(s.note)}</div>`:''}</td><td class="sub-price">€${fmt(s.price)}</td><td class="sub-cycle">${s.cycle}</td><td>${rd}</td><td><span class="status-badge ${sc}"><span class="dot"></span>${st}</span></td><td class="days-left">${dt}</td><td><span class="sub-category">${esc(s.category)}</span></td><td><span style="font-size:0.71rem;color:${WC[s.workspace]}">${WL[s.workspace]}</span></td><td class="actions"><button class="icon-btn" onclick="editSub('${s.id}')">✏️</button><button class="icon-btn del" onclick="deleteSub('${s.id}')">🗑️</button></td></tr>`;
+}
+
+function switchWs(w){activeWs=w;document.querySelectorAll('.ws-tab').forEach(t=>t.classList.remove('active'));document.querySelector(`.ws-tab[data-ws="${w}"]`).classList.add('active');renderTable();}
+function sortBy(f){if(sortField===f)sortAsc=!sortAsc;else{sortField=f;sortAsc=true;}renderTable();}
+
+function openModal(s){
+  document.getElementById('modalTitle').textContent=s?'Bewerken':'Nieuw abonnement';
+  document.getElementById('editId').value=s?s.id:'';
+  document.getElementById('fName').value=s?s.name:'';
+  document.getElementById('fPrice').value=s?s.price:'';
+  document.getElementById('fCycle').value=s?s.cycle:'maandelijks';
+  document.getElementById('fRenewal').value=s?s.renewal:'';
+  document.getElementById('fWarnDays').value=s?s.warnDays:7;
+  document.getElementById('fCategory').value=s?s.category:'Streaming';
+  document.getElementById('fWorkspace').value=s?s.workspace:(activeWs!=='all'?activeWs:'ferri');
+  document.getElementById('fNote').value=s?(s.note||''):'';
+  document.getElementById('modalOverlay').classList.add('active');
+  setTimeout(()=>document.getElementById('fName').focus(),100);
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('active');}
+function closeModalOutside(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
+
+function saveSub(){
+  const n=document.getElementById('fName').value.trim(),p=parseFloat(document.getElementById('fPrice').value)||0,c=document.getElementById('fCycle').value,r=document.getElementById('fRenewal').value,w=parseInt(document.getElementById('fWarnDays').value)||7,cat=document.getElementById('fCategory').value,ws=document.getElementById('fWorkspace').value,no=document.getElementById('fNote').value.trim(),eid=document.getElementById('editId').value;
+  if(!n){toast('Vul een naam in');return;}if(!r){toast('Vul een datum in');return;}
+  if(eid){const i=subs.findIndex(s=>s.id===eid);if(i>=0)subs[i]={...subs[i],name:n,price:p,cycle:c,renewal:r,warnDays:w,category:cat,workspace:ws,note:no};}
+  else subs.push({id:gid(),name:n,price:p,cycle:c,renewal:r,warnDays:w,category:cat,workspace:ws,note:no});
+  save();renderTable();closeModal();toast(eid?'Bijgewerkt ✓':'Toegevoegd ✓');
+}
+function editSub(id){const s=subs.find(x=>x.id===id);if(s)openModal(s);}
+function deleteSub(id){const s=subs.find(x=>x.id===id);if(s&&confirm(`"${s.name}" verwijderen?`)){subs=subs.filter(x=>x.id!==id);save();renderTable();toast('Verwijderd');}}
+
+function exportData(){const b=new Blob([JSON.stringify(subs,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`subtracker-${new Date().toISOString().slice(0,10)}.json`;a.click();toast('Geëxporteerd ✓');}
+function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=function(ev){try{const d=JSON.parse(ev.target.result);if(Array.isArray(d)&&confirm(d.length+' items. Overschrijven?')){subs=d;save();renderTable();toast('Geïmporteerd ✓');}}catch{toast('Ongeldig bestand');}};r.readAsText(f);e.target.value='';}
+function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500);}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+let scannedItems = [];
+
+async function scanScreenshot(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+
+  // Show modal
+  document.getElementById('scanOverlay').classList.add('active');
+  document.getElementById('scanStage1').style.display = 'block';
+  document.getElementById('scanStage2').style.display = 'none';
+  document.getElementById('scanError').style.display = 'none';
+
+  // Show preview
+  const prev = document.getElementById('scanPreview');
+  const img = document.getElementById('scanImg');
+  const reader = new FileReader();
+  reader.onload = async function(ev) {
+    img.src = ev.target.result;
+    prev.style.display = 'block';
+    document.getElementById('scanLoading').style.display = 'block';
+
+    // Extract base64 data
+    const base64 = ev.target.result.split(',')[1];
+    const mediaType = file.type || 'image/png';
+
+    try {
+      document.getElementById('scanStatus').textContent = 'Screenshot wordt geanalyseerd door AI...';
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: base64 }
+              },
+              {
+                type: 'text',
+                text: `Analyze this screenshot and extract ALL subscriptions/abonnementen visible. For each subscription found, return a JSON array. Each item should have:
+- "name": the subscription/app name (string)
+- "price": the price as a number (use 0 if free or unclear)
+- "cycle": one of "maandelijks", "jaarlijks", "kwartaal", "halfjaarlijks", "wekelijks" (detect from context like "Monthly", "Yearly", "per maand", "per jaar", etc.)
+- "renewal": the renewal/next payment date in YYYY-MM-DD format (if visible, otherwise estimate based on today being ${new Date().toISOString().slice(0,10)})
+- "category": one of "Streaming", "Software", "Cloud", "AI", "Muziek", "Telecom", "Verzekering", "Sport", "Nieuws", "Gaming", "Auto", "Beveiliging", "Productiviteit", "Social Media", "Zakelijk", "Anders"
+- "note": any extra details visible (plan name, features, status like "Opgezegd")
+
+IMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no backticks, no explanation. Just the raw JSON array.
+If no subscriptions are found, return an empty array: []`
+              }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API fout: ${response.status}`);
+      }
+
+      const data = await response.json();
+      let text = '';
+      for (const block of data.content) {
+        if (block.type === 'text') text += block.text;
+      }
+
+      // Parse JSON - strip any accidental markdown
+      text = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      const items = JSON.parse(text);
+
+      if (!Array.isArray(items) || items.length === 0) {
+        document.getElementById('scanStage1').style.display = 'none';
+        document.getElementById('scanError').style.display = 'block';
+        document.getElementById('scanErrorMsg').textContent = 'Geen abonnementen gevonden in deze screenshot.';
+        return;
+      }
+
+      // Show results
+      scannedItems = items.map((item, i) => ({ ...item, selected: true, idx: i }));
+      showScanResults();
+
+    } catch (err) {
+      console.error('Scan error:', err);
+      document.getElementById('scanStage1').style.display = 'none';
+      document.getElementById('scanError').style.display = 'block';
+      document.getElementById('scanErrorMsg').textContent = 'Fout bij scannen: ' + err.message;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function showScanResults() {
+  document.getElementById('scanStage1').style.display = 'none';
+  document.getElementById('scanStage2').style.display = 'block';
+  document.getElementById('scanFoundMsg').textContent = `${scannedItems.length} abonnement(en) gevonden. Klik om te selecteren/deselecteren:`;
+
+  const container = document.getElementById('scanResults');
+  container.innerHTML = `<div class="scan-results-scroll">${scannedItems.map((item, i) => {
+    const cycleLabel = item.cycle || 'maandelijks';
+    const priceStr = item.price > 0 ? `€${fmt(item.price)}` : 'Gratis';
+    return `<div class="scan-item ${item.selected ? 'selected' : ''}" onclick="toggleScanItem(${i})">
+      <div class="scan-check">${item.selected ? '✓' : ''}</div>
+      <div class="scan-info">
+        <div class="si-name">${esc(item.name)}</div>
+        <div class="si-detail">${cycleLabel}${item.note ? ' · ' + esc(item.note) : ''}</div>
+      </div>
+      <div class="scan-price">${priceStr}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function toggleScanItem(i) {
+  scannedItems[i].selected = !scannedItems[i].selected;
+  showScanResults();
+}
+
+function addScanned() {
+  const ws = document.getElementById('scanWorkspace').value;
+  const selected = scannedItems.filter(s => s.selected);
+  if (selected.length === 0) { toast('Selecteer minimaal 1 item'); return; }
+
+  let added = 0;
+  for (const item of selected) {
+    // Check for duplicates by name
+    const exists = subs.some(s => s.name.toLowerCase() === item.name.toLowerCase());
+    if (exists) continue;
+
+    subs.push({
+      id: gid(),
+      name: item.name,
+      price: parseFloat(item.price) || 0,
+      cycle: item.cycle || 'maandelijks',
+      renewal: item.renewal || new Date().toISOString().slice(0, 10),
+      warnDays: item.cycle === 'jaarlijks' ? 14 : 7,
+      category: item.category || 'Anders',
+      workspace: ws,
+      note: item.note || ''
+    });
+    added++;
+  }
+
+  save();
+  renderTable();
+  closeScan();
+  if (added > 0) {
+    toast(`${added} abonnement(en) toegevoegd ✓`);
+  } else {
+    toast('Alle items bestonden al');
+  }
+}
+
+function closeScan() {
+  document.getElementById('scanOverlay').classList.remove('active');
+  scannedItems = [];
+}
+
+load();renderTable();
+</script>
+</body>
+</html>
